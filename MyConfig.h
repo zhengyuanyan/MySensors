@@ -261,6 +261,78 @@
  * @{
  */
 
+ /**
+ * @def MY_CAN
+ * @brief Define this to use the CAN wired transport for sensor network communication.
+ */
+//#define MY_CAN
+/**
+ * @def MY_DEBUG_VERBOSE_CAN
+ * @brief Define this for verbose debug prints related to the %CAN driver.
+ */
+//#define MY_DEBUG_VERBOSE_CAN
+/**
+ * 
+ * @def MY_CAN_TX_PIN
+ * @brief ESP32 Message transmit pin.
+ */
+#ifndef MY_CAN_TX_PIN
+#define MY_CAN_TX_PIN (17u)
+#endif
+/**
+ * 
+ * @def MY_CAN_RX_PIN
+ * @brief ESP32 Message received interrupt pin.
+ */
+#ifndef MY_CAN_RX_PIN
+#define MY_CAN_RX_PIN (18u)
+#endif
+/**
+ * 
+ * @def MY_STM32_CAN_PIN
+ * @brief Message STM32 CAN pin.
+ */
+#ifndef MY_STM32_CAN_PIN
+#define MY_STM32_CAN_PIN ALT
+#endif
+/**
+ * 
+ * @def MY_CAN_INT
+ * @brief Message arrived interrupt pin.
+ */
+#ifndef MY_CAN_INT
+#define MY_CAN_INT (2u)
+#endif
+/**
+ * @def MY_CAN_CS
+ * @brief Chip select pin.
+ */
+#ifndef MY_CAN_CS
+#define MY_CAN_CS (10u)
+#endif
+/**
+ * @def MY_CAN_SPEED
+ * @brief Baud rate. Allowed values can be found in mcp_can_dfs.h
+ */
+#ifndef MY_CAN_SPEED
+#define MY_CAN_SPEED (125000u)
+#endif
+/**
+ * @def MY_CAN_CLOCK
+ * @brief can clock. Allowed values can be found in mcp_can_dfs.h
+ */
+#ifndef MY_CAN_CLOCK
+#define MY_CAN_CLOCK MCP_8MHZ
+#endif
+/**
+ * @def MY_CAN_BUF_SIZE
+ * @brief assemble buffer size. Since long messages can be sliced and arrive mixed with other messages, assemble buffer is required.
+ */
+#ifndef MY_CAN_BUF_SIZE
+#define MY_CAN_BUF_SIZE (8u)
+#endif
+
+#define BROADCAST_ADDRESS       (255) // 广播地址
 /**
  * @def MY_RS485
  * @brief Define this to use the RS485 wired transport for sensor network communication.
@@ -2555,7 +2627,7 @@
 #endif
 
 // Enable sensor network "feature" if one of the transport types was enabled
-#if defined(MY_RADIO_RF24) || defined(MY_RADIO_NRF5_ESB) || defined(MY_RADIO_RFM69) || defined(MY_RADIO_RFM95) || defined(MY_RADIO_SX126x) || defined(MY_RS485) || defined(MY_PJON)
+#if defined(MY_RADIO_RF24) || defined(MY_RADIO_NRF5_ESB) || defined(MY_RADIO_RFM69) || defined(MY_RADIO_RFM95) || defined(MY_RADIO_SX126x) || defined(MY_RS485) || defined(MY_PJON) || defined(MY_CAN) || defined(STM32_CAN) || defined(ESP32_CAN)
 #define MY_SENSOR_NETWORK
 #endif
 
@@ -2724,6 +2796,11 @@
 // FOTA update
 #define MY_DEBUG_VERBOSE_OTA_UPDATE
 #define MY_OTA_USE_I2C_EEPROM
+// CAN
+#define MY_CAN
+// #define STM32_CAN_BUS
+// #define ESP32_CAN_BUS
+#define MY_DEBUG_VERBOSE_CAN
 // RS485
 #define MY_RS485
 #define MY_RS485_DE_PIN

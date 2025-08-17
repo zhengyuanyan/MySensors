@@ -73,6 +73,9 @@
 #elif defined(ARDUINO_ARCH_STM32F1)
 #include "hal/architecture/STM32F1/MyHwSTM32F1.cpp"
 #include "hal/crypto/generic/MyCryptoGeneric.cpp"
+#elif defined(ARDUINO_ARCH_STM32)
+#include "hal/architecture/STM32/MyHwSTM32.cpp"
+#include "hal/crypto/generic/MyCryptoGeneric.cpp"
 #elif defined(ARDUINO_ARCH_NRF5) || defined(ARDUINO_ARCH_NRF52)
 #include "hal/architecture/NRF5/MyHwNRF5.cpp"
 #include "hal/crypto/generic/MyCryptoGeneric.cpp"
@@ -291,6 +294,21 @@ MY_DEFAULT_RX_LED_PIN in your sketch instead to enable LEDs
 #else
 #define __RS485CNT 0	//!< __RS485CNT
 #endif
+#if defined(MY_CAN)
+#define __CANCNT 1	//!< __CANCNT
+#else
+#define __CANCNT 0	//!< __CANCNT
+#endif
+// #if defined(STM32_CAN)
+// #define __CANCNT 1	//!< __CANCNT
+// #else
+// #define __CANCNT 0	//!< __CANCNT
+// #endif
+// #if defined(ESP32_CAN)
+// #define __CANCNT 1	//!< __CANCNT
+// #else
+// #define __CANCNT 0	//!< __CANCNT
+// #endif
 #if defined(MY_PJON)
 #define _PJONCNT 1	//!< _PJONCNT
 #else
@@ -301,7 +319,7 @@ MY_DEFAULT_RX_LED_PIN in your sketch instead to enable LEDs
 #else
 #define __SX126xCNT 0   //!< __SX126xCNT
 #endif
-#if (__RF24CNT + __NRF5ESBCNT + __RFM69CNT + __RFM95CNT + __RS485CNT + _PJONCNT + __SX126xCNT > 1)
+#if (__RF24CNT + __NRF5ESBCNT + __RFM69CNT + __RFM95CNT + __RS485CNT + _PJONCNT + __SX126xCNT + __CANCNT > 1)
 #error Only one forward link driver can be activated
 #endif
 #endif //DOXYGEN
@@ -312,7 +330,7 @@ MY_DEFAULT_RX_LED_PIN in your sketch instead to enable LEDs
 #endif
 
 // TRANSPORT INCLUDES
-#if defined(MY_RADIO_RF24) || defined(MY_RADIO_NRF5_ESB) || defined(MY_RADIO_RFM69) || defined(MY_RADIO_RFM95) || defined(MY_RS485) || defined (MY_PJON) || defined(MY_RADIO_SX126x)
+#if defined(MY_RADIO_RF24) || defined(MY_RADIO_NRF5_ESB) || defined(MY_RADIO_RFM69) || defined(MY_RADIO_RFM95) || defined(MY_RS485) || defined (MY_PJON) || defined(MY_RADIO_SX126x) || defined(MY_CAN)
 #include "hal/transport/MyTransportHAL.h"
 #include "core/MyTransport.h"
 
@@ -336,7 +354,7 @@ MY_DEFAULT_RX_LED_PIN in your sketch instead to enable LEDs
 #define MY_RAM_ROUTING_TABLE_ENABLED
 #elif defined(MY_RAM_ROUTING_TABLE_FEATURE) && defined(MY_REPEATER_FEATURE)
 // activate feature based on architecture
-#if defined(ARDUINO_ARCH_ESP8266) || defined(ARDUINO_ARCH_ESP32) || defined(ARDUINO_ARCH_SAMD) || defined(ARDUINO_ARCH_NRF5) || defined(ARDUINO_ARCH_STM32F1) || defined(TEENSYDUINO) || defined(__linux__) || defined(__ASR6501__) || defined (__ASR6502__)
+#if defined(ARDUINO_ARCH_ESP8266) || defined(ARDUINO_ARCH_ESP32) || defined(ARDUINO_ARCH_SAMD) || defined(ARDUINO_ARCH_NRF5) || defined(ARDUINO_ARCH_STM32) || defined(ARDUINO_ARCH_STM32F1) || defined(TEENSYDUINO) || defined(__linux__) || defined(__ASR6501__) || defined (__ASR6502__)
 #define MY_RAM_ROUTING_TABLE_ENABLED
 #elif defined(ARDUINO_ARCH_AVR) || defined(ARDUINO_ARCH_MEGAAVR)
 #if defined(__avr_atmega1280__) || defined(__avr_atmega1284__) || defined(__avr_atmega2560__) || defined(__avr_attiny3224__) || defined(__avr_attiny3227__)
@@ -396,6 +414,8 @@ MY_DEFAULT_RX_LED_PIN in your sketch instead to enable LEDs
 #elif defined(MY_RADIO_RFM95)
 #include "hal/transport/RFM95/driver/RFM95.cpp"
 #include "hal/transport/RFM95/MyTransportRFM95.cpp"
+#elif defined(MY_CAN)
+#include "hal/transport/CAN/MyTransportCAN.cpp"
 #elif defined(MY_PJON)
 #include "hal/transport/PJON/driver/PJON.h"
 #include "hal/transport/PJON/driver/PJONSoftwareBitBang.h"
@@ -474,6 +494,8 @@ MY_DEFAULT_RX_LED_PIN in your sketch instead to enable LEDs
 #include "hal/architecture/Linux/MyMainLinuxGeneric.cpp"
 #elif defined(ARDUINO_ARCH_STM32F1)
 #include "hal/architecture/STM32F1/MyMainSTM32F1.cpp"
+#elif defined(ARDUINO_ARCH_STM32)
+#include "hal/architecture/STM32/MyMainSTM32.cpp"
 #elif defined(__ASR6501__) || defined(__ASR6502__)
 #include "hal/architecture/ASR650x/MyMainASR650x.cpp"
 #elif defined(__arm__) && defined(TEENSYDUINO)
