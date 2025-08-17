@@ -277,7 +277,7 @@
  * @brief ESP32 Message transmit pin.
  */
 #ifndef MY_CAN_TX_PIN
-#define MY_CAN_TX_PIN (17u)
+#define MY_CAN_TX_PIN GPIO_NUM_4
 #endif
 /**
  * 
@@ -285,7 +285,7 @@
  * @brief ESP32 Message received interrupt pin.
  */
 #ifndef MY_CAN_RX_PIN
-#define MY_CAN_RX_PIN (18u)
+#define MY_CAN_RX_PIN GPIO_NUM_5
 #endif
 /**
  * 

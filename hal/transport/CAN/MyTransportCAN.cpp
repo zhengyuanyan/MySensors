@@ -47,19 +47,21 @@
  * of the authors and should not be interpreted as representing official policies,
  * either expressed or implied, of Majenko Technologies.
  ********************************************************************************/
-#include <stdint.h>
-#include <stddef.h>
-#include <stdbool.h>
+// #include <stdint.h>
+// #include <stddef.h>
+// #include <stdbool.h>
+// #define ARDUINO_ARCH_STM32
 
 #if defined(ARDUINO_ARCH_ESP32)
+
 #include "driver/twai.h"
+#include "driver/gpio.h"
+
 #elif defined(ARDUINO_ARCH_STM32)
-#define HAL_CAN_MODULE_ENABLED
-#define AFIO_MAPR_CAN_REMAP1
-#include "stm32f1xx_hal.h" // F1 系列
-#include "stm32f1xx_hal_can.h"
+
 #include "hal/transport/CAN/driver/STM32_CAN/src/STM32_CAN.h"
 #include "hal/transport/CAN/driver/STM32_CAN/src/STM32_CAN.cpp"
+
 #else
 #include "hal/transport/CAN/driver/MCP_CAN_lib/mcp_can.h"
 #include "hal/transport/CAN/driver/MCP_CAN_lib/mcp_can_dfs.h"
@@ -74,10 +76,12 @@
 
 // Platform-specific CAN initialization
 #if defined(ARDUINO_ARCH_ESP32)
+
+
 #elif defined(ARDUINO_ARCH_STM32)
-STM32_CAN CAN0(CAN1, MY_STM32_CAN_PIN);
+
 #else
-MCP_CAN CAN0(MY_CAN_CS);
+MCP_CAN _MCP_CAN(MY_CAN_CS);
 #endif
 
 bool canInitialized = false;
@@ -191,10 +195,16 @@ bool transportInit(void)
     if(twai_driver_install(&g_config, &t_config, &f_config)!=ESP_OK) return false;
     if(twai_start()!=ESP_OK) return false;
 #elif defined(ARDUINO_ARCH_STM32)
-    CAN0.begin();
-    CAN0.setBaudRate(MY_CAN_SPEED);
+if (!CANInit(MY_CAN_SPEED, 2)) {
+    CAN_DEBUG("CAN:INIT Failed\n");
+    return false;
+}
+if(!CANStart()){
+    CAN_DEBUG("CAN:START Failed\n");
+    return false;
+}
 #else
-    if(CAN0.begin(MCP_STDEXT, MY_CAN_SPEED, MY_CAN_CLOCK)!=CAN_OK) return false;
+    if(_MCP_CAN.begin(MCP_STDEXT, MY_CAN_SPEED, MY_CAN_CLOCK)!=CAN_OK) return false;
 #endif
 
     canInitialized = true;
@@ -225,11 +235,19 @@ bool transportSend(const uint8_t to, const void *data, const uint8_t len, const 
         memcpy(msg.data, buf, partLen);
         if(twai_transmit(&msg,pdMS_TO_TICKS(100))!=ESP_OK){ CAN_DEBUG("!CAN:SND:FAIL part=%u\n",part); return false; }
 #elif defined(ARDUINO_ARCH_STM32)
-        CAN_message_t msg; msg.id=header; msg.ext=1; msg.k=partLen;
-        memcpy(msg.buf, buf, partLen);
-        if(!CAN0.write(msg)){ CAN_DEBUG("!CAN:SND:FAIL part=%u\n",part); return false; }
+        CAN_msg_t msg={};
+        msg.id = header; msg.len = partLen; msg.format = EXTENDED_FORMAT; msg.type = 0;
+        memcpy(msg.data, buf, partLen);
+ 
+        // CANSend(&msg);
+        if (!CANSend(&msg))
+        {
+            CAN_DEBUG("!CAN:SND:FAIL part=%u\n", part);
+            return false;
+        }
+        
 #else
-        if(CAN0.sendMsgBuf(header, partLen, buf)!=CAN_OK){ CAN_DEBUG("!CAN:SND:FAIL part=%u\n",part); return false; }
+        if(_MCP_CAN.sendMsgBuf(header, partLen, buf)!=CAN_OK){ CAN_DEBUG("!CAN:SND:FAIL part=%u\n",part); return false; }
 #endif
         CAN_DEBUG("CAN:SND:part=%u len=%u OK\n", part, partLen);
     }
@@ -244,11 +262,13 @@ bool transportDataAvailable(void)
     if(twai_receive(&msg,0)!=ESP_OK) return false;
     rxId=msg.identifier; len=msg.data_length_code; memcpy(rxBuf,msg.data,len);
 #elif defined(ARDUINO_ARCH_STM32)
-    CAN_message_t msg;
-    if(!CAN0.read(msg)) return false;
-    rxId=msg.id; len=msg.len; memcpy(rxBuf,msg.buf,len);
+    CAN_msg_t msg={};
+    if(!CANReceive(&msg)) return false;
+        rxId = msg.id; 
+        len = msg.len;
+        memcpy(rxBuf, msg.data, len);
 #else
-    if(!hwDigitalRead(MY_CAN_INT) || CAN0.readMsgBuf(&rxId,&len,rxBuf)!=CAN_OK) return false;
+    if(!hwDigitalRead(MY_CAN_INT) || _MCP_CAN.readMsgBuf(&rxId,&len,rxBuf)!=CAN_OK) return false;
 #endif
 
     uint8_t from,to,partIdx,totalParts,msgId;
@@ -316,9 +336,9 @@ void transportPowerDown(void){
 #if defined(ARDUINO_ARCH_ESP32) 
     twai_stop();
 #elif defined(ARDUINO_ARCH_STM32) 
-    CAN0.end();
+    CANDeinit();
 #else 
-    CAN0.setMode(MCP_SLEEP);
+    _MCP_CAN.setMode(MCP_SLEEP);
 #endif
     CAN_DEBUG("CAN:PowerDown\n");
 }
@@ -327,9 +347,9 @@ void transportPowerUp(void){
 #if defined(ARDUINO_ARCH_ESP32)
     twai_start();
 #elif defined(ARDUINO_ARCH_STM32)
-    CAN0.begin(MY_CAN_SPEED);
+    CANStart();
 #else
-    CAN0.setMode(MCP_NORMAL);
+    _MCP_CAN.setMode(MCP_NORMAL);
 #endif
     CAN_DEBUG("CAN:PowerUp\n");
 }
