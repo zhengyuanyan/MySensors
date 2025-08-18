@@ -47,15 +47,33 @@
  * of the authors and should not be interpreted as representing official policies,
  * either expressed or implied, of Majenko Technologies.
  ********************************************************************************/
-// #include <stdint.h>
-// #include <stddef.h>
-// #include <stdbool.h>
+#include <stdint.h>
+#include <stddef.h>
+#include <stdbool.h>
 // #define ARDUINO_ARCH_STM32
+// #define ARDUINO_ARCH_ESP32
 
 #if defined(ARDUINO_ARCH_ESP32)
 
 #include "driver/twai.h"
 #include "driver/gpio.h"
+
+typedef struct {
+    uint32_t kbps;
+    twai_timing_config_t timing;
+}ESP32_CAN_bitrateEntry;
+
+static const ESP32_CAN_bitrateEntry ESP32_CAN_bitrateTable[] = {
+    {50000,   TWAI_TIMING_CONFIG_50KBITS()},
+    {100000,  TWAI_TIMING_CONFIG_100KBITS()},
+    {125000,  TWAI_TIMING_CONFIG_125KBITS()},
+    {250000,  TWAI_TIMING_CONFIG_250KBITS()},
+    {500000,  TWAI_TIMING_CONFIG_500KBITS()},
+    {800000,  TWAI_TIMING_CONFIG_800KBITS()},
+    {1000000, TWAI_TIMING_CONFIG_1MBITS()}
+};
+
+#define ESP32_CAN_bitrateTableSize (sizeof(ESP32_CAN_bitrateTable)/sizeof(ESP32_CAN_bitrateTable[0]))
 
 #elif defined(ARDUINO_ARCH_STM32)
 
@@ -63,9 +81,9 @@
 #include "hal/transport/CAN/driver/STM32_CAN/src/STM32_CAN.cpp"
 
 #else
-#include "hal/transport/CAN/driver/MCP_CAN_lib/mcp_can.h"
-#include "hal/transport/CAN/driver/MCP_CAN_lib/mcp_can_dfs.h"
-#include "hal/transport/CAN/driver/MCP_CAN_lib/mcp_can.cpp"
+#include "hal/transport/CAN/driver/MCP_CAN/mcp_can.h"
+#include "hal/transport/CAN/driver/MCP_CAN/mcp_can_dfs.h"
+#include "hal/transport/CAN/driver/MCP_CAN/mcp_can.cpp"
 #endif
 
 #if defined(MY_DEBUG_VERBOSE_CAN)
@@ -180,20 +198,83 @@ uint8_t _findCanPacketSlot(long unsigned int from, long unsigned int currentPart
     return slot;
 }
 
+//filter incoming messages (MCP2515 feature).
+bool _initFilters()
+{
+	if (!canInitialized) {
+		return false;
+	}
+    #if defined(ARDUINO_ARCH_STM32)
+
+        return true;
+    #elif defined(ARDUINO_ARCH_ESP32)
+        
+        return true;
+    #elif defined(__linux__)
+
+        return true;
+    #else
+        uint8_t err = 0;
+	    err += _MCP_CAN.setMode(MODE_CONFIG);
+
+	    err += _MCP_CAN.init_Mask(0, 1, 0x0000FF00);                // Init first mask. Only destination address will be used to filter messages
+	    err += _MCP_CAN.init_Filt(0, 1, BROADCAST_ADDRESS << 8);      // Init first filter. Accept broadcast messages.
+	    err += _MCP_CAN.init_Filt(1, 1,  _nodeId << 8);                // Init second filter. Accept messages send to this node.
+    	//second mask and filters need to be set. Otherwise all messages would be accepted.
+	    err += _MCP_CAN.init_Mask(1, 1, 0xFFFFFFFF);                // Init second mask.
+	    err += _MCP_CAN.init_Filt(2, 1, 0xFFFFFFFF);                // Init third filter.
+	    err += _MCP_CAN.init_Filt(3, 1, 0xFFFFFFFF);                // Init fourth filter.
+	    err += _MCP_CAN.init_Filt(4, 1, 0xFFFFFFFF);                // Init fifth filter.
+	    err += _MCP_CAN.init_Filt(5, 1, 0xFFFFFFFF);                // Init sixth filter.
+	    err += _MCP_CAN.setMode(MCP_NORMAL);
+	    hwPinMode(MY_CAN_INT, INPUT);
+	    return err == 0;
+    #endif
+}
+
 // ===== Transport functions =====
 bool transportInit(void)
 {
     CAN_DEBUG("CAN:INIT NodeID=%u\n", _nodeId);
 
 #if defined(ARDUINO_ARCH_ESP32)
-    twai_general_config_t g_config = TWAI_GENERAL_CONFIG_DEFAULT(MY_CAN_TX_PIN, MY_CAN_RX_PIN, TWAI_MODE_NORMAL);
-    twai_timing_config_t t_config = {
-        .brp = (uint32_t)(80000000UL/(MY_CAN_SPEED*16)), // 80MHz / (speed*16)
-        .tseg_1 = 15, .tseg_2 = 8, .sjw = 3, .triple_sampling = false
+    const twai_timing_config_t *timing_config = NULL;
+    for (uint8_t i = 0; i < ESP32_CAN_bitrateTableSize; i++)
+    {
+        if (ESP32_CAN_bitrateTable[i].kbps == MY_CAN_SPEED)
+        {
+            timing_config = &ESP32_CAN_bitrateTable[i].timing;
+            break;
+        }
+    }
+    if (timing_config == NULL){
+        CAN_DEBUG("CAN:Bitrate Failed\n");
+        return false;
+    }
+    twai_general_config_t general_config = {
+        .mode = TWAI_MODE_NORMAL,
+        .tx_io = MY_CAN_TX_PIN,
+        .rx_io = MY_CAN_RX_PIN,
+        .clkout_io = TWAI_IO_UNUSED,
+        .bus_off_io = TWAI_IO_UNUSED,
+        .tx_queue_len = MY_CAN_BUF_SIZE,
+        .rx_queue_len = MY_CAN_BUF_SIZE,
+        // .alerts_enabled = TWAI_ALERT_NONE,
+        .clkout_divider = 0,
     };
-    twai_filter_config_t f_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
-    if(twai_driver_install(&g_config, &t_config, &f_config)!=ESP_OK) return false;
-    if(twai_start()!=ESP_OK) return false;
+
+    twai_filter_config_t filter_config = TWAI_FILTER_CONFIG_ACCEPT_ALL();
+
+    if (twai_driver_install(&general_config, timing_config, &filter_config) != ESP_OK)
+    {
+        CAN_DEBUG("CAN:Driver Failed\n");
+        return false;
+    }
+    if (twai_start() != ESP_OK)
+    {
+        CAN_DEBUG("CAN:Start Failed\n");
+        return false;
+    }
 #elif defined(ARDUINO_ARCH_STM32)
 if (!CANInit(MY_CAN_SPEED, 2)) {
     CAN_DEBUG("CAN:INIT Failed\n");
@@ -210,6 +291,7 @@ if(!CANStart()){
     canInitialized = true;
     for(uint8_t i=0;i<MY_CAN_BUF_SIZE;i++) _cleanSlot(i);
     CAN_DEBUG("CAN:INIT:OK\n");
+    // return _initFilters();
     return true;
 }
 

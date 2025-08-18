@@ -277,7 +277,7 @@
  * @brief ESP32 Message transmit pin.
  */
 #ifndef MY_CAN_TX_PIN
-#define MY_CAN_TX_PIN GPIO_NUM_4
+#define MY_CAN_TX_PIN GPIO_NUM_41
 #endif
 /**
  * 
@@ -285,7 +285,7 @@
  * @brief ESP32 Message received interrupt pin.
  */
 #ifndef MY_CAN_RX_PIN
-#define MY_CAN_RX_PIN GPIO_NUM_5
+#define MY_CAN_RX_PIN GPIO_NUM_42
 #endif
 /**
  * 
@@ -1595,7 +1595,7 @@
  * @note You can still have OTA FW updates without external flash but it
  *       requires the MYSBootloader and you must not define this flag.
  */
-//#define MY_OTA_FIRMWARE_FEATURE
+#define MY_OTA_FIRMWARE_FEATURE
 
 /**
  * @def MY_OTA_FLASH_SS
