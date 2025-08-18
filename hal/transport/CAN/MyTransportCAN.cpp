@@ -81,9 +81,9 @@ static const ESP32_CAN_bitrateEntry ESP32_CAN_bitrateTable[] = {
 #include "hal/transport/CAN/driver/STM32_CAN/src/STM32_CAN.cpp"
 
 #else
-#include "hal/transport/CAN/driver/MCP_CAN/mcp_can.h"
-#include "hal/transport/CAN/driver/MCP_CAN/mcp_can_dfs.h"
-#include "hal/transport/CAN/driver/MCP_CAN/mcp_can.cpp"
+#include "hal/transport/CAN/driver/MCP_CAN_lib/mcp_can.h"
+#include "hal/transport/CAN/driver/MCP_CAN_lib/mcp_can_dfs.h"
+#include "hal/transport/CAN/driver/MCP_CAN_lib/mcp_can.cpp"
 #endif
 
 #if defined(MY_DEBUG_VERBOSE_CAN)
