@@ -1,6 +1,19 @@
 {
     "files.associations": {
         "peripheralpins.c": "cpp",
-        "ratio": "cpp"
+        "ratio": "cpp",
+        "format": "cpp",
+        "initializer_list": "cpp",
+        "list": "cpp",
+        "utility": "cpp",
+        "vector": "cpp",
+        "xhash": "cpp",
+        "xstring": "cpp",
+        "xtree": "cpp",
+        "xutility": "cpp",
+        "chrono": "cpp",
+        "forward_list": "cpp",
+        "iosfwd": "cpp",
+        "xlocbuf": "cpp"
     }
 }

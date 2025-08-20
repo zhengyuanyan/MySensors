@@ -34,7 +34,7 @@ bool CANInit(uint32_t bitrate, int remap)
     AFIO->MAPR &= 0xFFFF9FFF;     // 清除 CAN remap 设置
 
     // 2. 根据 remap 配置对应 GPIO
-    if(remap == 0){
+    if(remap == 1){
         // 默认映射 PA11 = RX, PA12 = TX
         RCC->APB2ENR |= 0x4UL; 
         GPIOA->CRH &= ~(0xFF000UL);

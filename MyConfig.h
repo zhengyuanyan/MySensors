@@ -292,8 +292,8 @@
  * @def MY_STM32_CAN_PIN
  * @brief Message STM32 CAN pin.
  */
-#ifndef MY_STM32_CAN_PIN
-#define MY_STM32_CAN_PIN ALT
+#ifndef MY_STM32_CAN_NUM
+#define MY_STM32_CAN_NUM (2u)  // 1: 映射PA11 = RX, PA12 = TX, 2: 映射PB8 = RX, PB9 = TX, 3: 映射PD0 = RX, PD1 = TX
 #endif
 /**
  * 
@@ -1747,8 +1747,86 @@
 //#define MY_GATEWAY_TINYGSM
 //#define MY_GATEWAY_MQTT_CLIENT
 //#define MY_GATEWAY_SERIAL
+// #define MY_GATEWAY_ESP32_W5500
 
 
+// #define MY_DEFAULT_LED_PCA9685
+
+#if defined MY_DEFAULT_LED_PCA9685
+
+#define LED_POLARITY LED_COMMON_ANODE  // LED_COMMON_CATHODE(低电平灭，高电平亮) or LED_COMMON_ANODE(高电平灭，低电平亮)
+
+
+#ifndef PCA9685_I2C_SDA_PIN
+#define PCA9685_I2C_SDA_PIN 8
+#endif
+
+#ifndef PCA9685_I2C_SCL_PIN
+#define PCA9685_I2C_SCL_PIN 9
+#endif
+
+#ifndef PCA9685_I2C_FREQUENCY
+#define PCA9685_I2C_FREQUENCY 400000
+#endif
+
+#ifndef PCA9685_PWM_FREQUENCY
+#define PCA9685_PWM_FREQUENCY 500
+#endif
+
+#ifndef MY_DEFAULT_POWER_PCA9685_PIN
+#define MY_DEFAULT_POWER_PCA9685_PIN 0
+#endif
+
+#define MY_DEFAULT_ERR_LED_PIN 1  // Error led pin
+#define MY_DEFAULT_RX_LED_PIN  2  // Receive led pin
+#define MY_DEFAULT_TX_LED_PIN  3  // Transmit led pin
+
+#endif
+
+// 默认 W5500 引脚定义（可根据硬件修改）
+#if defined MY_GATEWAY_ESP32_W5500
+
+#ifndef ETH_PHY_TYPE
+#define ETH_PHY_TYPE    ETH_PHY_W5500
+#endif
+
+#ifndef ETH_PHY_ADDR
+#define ETH_PHY_ADDR    1
+#endif
+
+#ifndef ETH_PHY_SPI_HOST
+#define ETH_PHY_SPI_HOST    SPI2_HOST
+#endif
+
+#ifndef ETH_PHY_SPI_MISO
+#define ETH_PHY_SPI_MISO   12
+#endif
+
+#ifndef ETH_PHY_SPI_MOSI
+#define ETH_PHY_SPI_MOSI   11
+#endif
+
+#ifndef ETH_PHY_SPI_SCK
+#define ETH_PHY_SPI_SCK   13
+#endif
+
+#ifndef ETH_PHY_CS
+#define ETH_PHY_CS     14
+#endif
+
+#ifndef ETH_PHY_IRQ
+#define ETH_PHY_IRQ    39
+#endif
+
+#ifndef ETH_PHY_RST
+#define ETH_PHY_RST    38
+#endif
+
+#ifndef MY_W5500_PWR_EN
+#define MY_W5500_PWR_EN    40
+#endif
+
+#endif
 /**
 * @def MY_DEBUG_VERBOSE_GATEWAY
 * @brief Define this for verbose debug prints related to the gateway transport.
@@ -2568,7 +2646,7 @@
  * MY_IS_GATEWAY is true when @ref MY_GATEWAY_FEATURE is set.
  * MY_NODE_TYPE contain a string describing the class of sketch/node (gateway/repeater/node).
  */
-#if defined(MY_GATEWAY_SERIAL) || defined(MY_GATEWAY_W5100) || defined(MY_GATEWAY_ENC28J60) || defined(MY_GATEWAY_ESP8266) || defined(MY_GATEWAY_ESP32)|| defined(MY_GATEWAY_LINUX) || defined(MY_GATEWAY_MQTT_CLIENT) || defined(MY_GATEWAY_TINYGSM)
+#if defined(MY_GATEWAY_SERIAL) || defined(MY_GATEWAY_W5100) || defined(MY_GATEWAY_ENC28J60) || defined(MY_GATEWAY_ESP8266) || defined(MY_GATEWAY_ESP32)|| defined(MY_GATEWAY_LINUX) || defined(MY_GATEWAY_MQTT_CLIENT) || defined(MY_GATEWAY_TINYGSM) || defined(MY_GATEWAY_ESP32_W5500)
 #define MY_GATEWAY_FEATURE
 #define MY_IS_GATEWAY (true)
 #define MY_NODE_TYPE "GW"
@@ -2755,6 +2833,7 @@
 #define MY_GATEWAY_ENC28J60
 #define MY_GATEWAY_ESP8266
 #define MY_GATEWAY_ESP32
+#define MY_GATEWAY_ESP32_W5500
 #define MY_WIFI_SSID
 #define MY_WIFI_BSSID
 #define MY_WIFI_PASSWORD

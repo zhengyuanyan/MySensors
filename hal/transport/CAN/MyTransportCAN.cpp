@@ -276,7 +276,7 @@ bool transportInit(void)
         return false;
     }
 #elif defined(ARDUINO_ARCH_STM32)
-if (!CANInit(MY_CAN_SPEED, 2)) {
+if (!CANInit(MY_CAN_SPEED, MY_STM32_CAN_NUM)) {
     CAN_DEBUG("CAN:INIT Failed\n");
     return false;
 }

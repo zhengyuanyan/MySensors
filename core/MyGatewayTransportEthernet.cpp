@@ -47,8 +47,8 @@ extern MyMessage _msgTmp;
 #undef MY_ESP8266_HOSTNAME // cleanup
 #endif
 
-#if defined(MY_GATEWAY_ESP8266) || defined(MY_GATEWAY_ESP32)
-#if !defined(MY_WIFI_SSID)
+#if defined(MY_GATEWAY_ESP8266) || defined(MY_GATEWAY_ESP32) || defined(MY_GATEWAY_ESP32_W5500)
+#if !defined(MY_WIFI_SSID) && !defined(MY_GATEWAY_ESP32_W5500)
 #error ESP8266/ESP32 gateway: MY_WIFI_SSID not defined!
 #endif
 #endif
@@ -61,14 +61,14 @@ extern MyMessage _msgTmp;
 #define _ethernetGatewayIP IPAddress(MY_IP_ADDRESS)
 #if defined(MY_IP_GATEWAY_ADDRESS)
 #define _gatewayIp IPAddress(MY_IP_GATEWAY_ADDRESS)
-#elif defined(MY_GATEWAY_ESP8266) || defined(MY_GATEWAY_ESP32)
+#elif defined(MY_GATEWAY_ESP8266) || defined(MY_GATEWAY_ESP32) || defined(MY_GATEWAY_ESP32_W5500)
 // Assume the gateway will be the machine on the same network as the local IP
 // but with last octet being '1'
 #define _gatewayIp IPAddress(_ethernetGatewayIP[0], _ethernetGatewayIP[1], _ethernetGatewayIP[2], 1)
 #endif /* End of MY_IP_GATEWAY_ADDRESS */
 #if defined(MY_IP_SUBNET_ADDRESS)
 #define _subnetIp IPAddress(MY_IP_SUBNET_ADDRESS)
-#elif defined(MY_GATEWAY_ESP8266) || defined(MY_GATEWAY_ESP32)
+#elif defined(MY_GATEWAY_ESP8266) || defined(MY_GATEWAY_ESP32) || defined(MY_GATEWAY_ESP32_W5500)
 #define _subnetIp IPAddress(255, 255, 255, 0)
 #endif /* End of MY_IP_SUBNET_ADDRESS */
 #endif /* End of MY_IP_ADDRESS */
@@ -88,7 +88,7 @@ typedef struct {
 	uint8_t idx;
 } inputBuffer;
 
-#if defined(MY_GATEWAY_ESP8266) || defined(MY_GATEWAY_ESP32)
+#if defined(MY_GATEWAY_ESP8266) || defined(MY_GATEWAY_ESP32) || defined(MY_GATEWAY_ESP32_W5500)
 // Some re-defines to make code more readable below
 #define EthernetServer WiFiServer
 #define EthernetClient WiFiClient
@@ -112,7 +112,7 @@ static inputBuffer inputString;
 #else
 static EthernetClient client = EthernetClient();
 #endif /* End of MY_USE_UDP */
-#elif defined(MY_GATEWAY_ESP8266) || defined(MY_GATEWAY_ESP32) || defined(MY_GATEWAY_LINUX)
+#elif defined(MY_GATEWAY_ESP8266) || defined(MY_GATEWAY_ESP32) || defined(MY_GATEWAY_ESP32_W5500) || defined(MY_GATEWAY_LINUX)
 static EthernetClient clients[MY_GATEWAY_MAX_CLIENTS];
 static bool clientsConnected[MY_GATEWAY_MAX_CLIENTS];
 static inputBuffer inputString[MY_GATEWAY_MAX_CLIENTS];
@@ -140,7 +140,24 @@ void _w5100_spi_en(const bool enable)
 #endif
 }
 
-#if !defined(MY_IP_ADDRESS) && defined(MY_GATEWAY_W5100)
+void _eth_power_en(const bool enable)
+{
+#if defined(MY_W5500_PWR_EN)
+	if (enable) {
+		// Pull up pin
+		hwPinMode(MY_W5500_PWR_EN, OUTPUT);
+		hwDigitalWrite(MY_W5500_PWR_EN, HIGH);
+	} else {
+		// Ground pin
+		hwPinMode(MY_W5500_PWR_EN, OUTPUT);
+		hwDigitalWrite(MY_W5500_PWR_EN, LOW);
+	}
+#else
+	(void)enable;
+#endif
+}
+
+#if !defined(MY_IP_ADDRESS) && (defined(MY_GATEWAY_W5100) || defined(MY_GATEWAY_ESP32_W5500))
 void gatewayTransportRenewIP(void)
 {
 	/* renew/rebind IP address
@@ -150,17 +167,41 @@ void gatewayTransportRenewIP(void)
 	 3 - rebind failed
 	 4 - rebind success
 	 */
+#if defined(MY_GATEWAY_W5100)
 	if (Ethernet.maintain() & ~(0x06)) {
 		GATEWAY_DEBUG(PSTR("!GWT:TRC:IP RENEW FAIL\n"));
 	}
+#elif defined(MY_GATEWAY_ESP32_W5500)
+	// For ESP32 with W5500, we need to check Ethernet connection status
+	// and reconnect if necessary
+	if (!ETH.linkUp()) {
+		GATEWAY_DEBUG(PSTR("!GWT:TRC:ETH LINK DOWN\n"));
+		// Reinitialize Ethernet
+		gatewayTransportInit();
+	}
+#endif
 }
 #endif
 
 bool gatewayTransportInit(void)
 {
 	_w5100_spi_en(true);
-
-#if defined(MY_GATEWAY_ESP8266) || defined(MY_GATEWAY_ESP32)
+    _eth_power_en(true);
+#if defined(MY_GATEWAY_W5100)
+	// W5100 initialization
+	if (!Ethernet.begin(_ethernetGatewayMAC)) {
+		GATEWAY_DEBUG(PSTR("!GWT:TIN:ETH INIT FAIL\n"));
+		_w5100_spi_en(false);
+		return false;
+	}
+	GATEWAY_DEBUG(PSTR("GWT:TIN:IP=%" PRIu8 ".%" PRIu8 ".%" PRIu8 ".%" PRIu8 "\n"),
+	              Ethernet.localIP()[0],
+	              Ethernet.localIP()[1], Ethernet.localIP()[2], Ethernet.localIP()[3]);
+	// give the Ethernet interface a second to initialize
+	delay(1000);
+	
+#elif defined(MY_GATEWAY_ESP8266) || defined(MY_GATEWAY_ESP32)
+	// WiFi initialization for ESP8266/ESP32
 	// Turn off access point
 	WiFi.mode(WIFI_STA);
 #if defined(MY_GATEWAY_ESP8266)
@@ -177,9 +218,44 @@ bool gatewayTransportInit(void)
 		GATEWAY_DEBUG(PSTR("GWT:TIN:CONNECTING...\n"));
 	}
 	GATEWAY_DEBUG(PSTR("GWT:TIN:IP: %s\n"), WiFi.localIP().toString().c_str());
-#elif defined(MY_GATEWAY_LINUX)
-	// Nothing to do here
+	
+#elif defined(MY_GATEWAY_ESP32_W5500)
+	// ESP32 with W5500 Ethernet initialization
+#if defined(ETH_PHY_TYPE) && defined(ETH_PHY_ADDR) && defined(ETH_PHY_CS) && defined(ETH_PHY_IRQ) && defined(ETH_PHY_RST)
+	// Advanced initialization with specific pin configuration
+	ETH.macAddress(_ethernetGatewayMAC);
+	ETH.begin(ETH_PHY_TYPE, ETH_PHY_ADDR, ETH_PHY_CS, ETH_PHY_IRQ, ETH_PHY_RST, 
+	          ETH_PHY_SPI_HOST, ETH_PHY_SPI_SCK, ETH_PHY_SPI_MISO, ETH_PHY_SPI_MOSI);
 #else
+	// Simple initialization
+    ETH.macAddress(_ethernetGatewayMAC);
+	ETH.begin();
+#endif
+
+#ifdef MY_IP_ADDRESS
+	ETH.config(_ethernetGatewayIP, _gatewayIp, _subnetIp);
+#endif
+
+	// Wait for Ethernet connection
+	unsigned long startTime = millis();
+	while (!ETH.linkUp()) {
+		if (millis() - startTime > 30000) { // 30 second timeout
+			GATEWAY_DEBUG(PSTR("!GWT:TIN:ETH CONNECT TIMEOUT\n"));
+			_w5100_spi_en(false);
+			return false;
+		}
+		delay(1000);
+		GATEWAY_DEBUG(PSTR("GWT:TIN: W5500 CONNECTING ETH...\n"));
+	}
+	
+	GATEWAY_DEBUG(PSTR("GWT:TIN:W5500 ETH IP: %s\n"), ETH.localIP().toString().c_str());
+	GATEWAY_DEBUG(PSTR("GWT:TIN:W5500 ETH MAC: %s\n"), ETH.macAddress().c_str());
+	
+#elif defined(MY_GATEWAY_LINUX)
+	// Nothing to do here for Linux
+	
+#else
+	// Standard Ethernet initialization (Arduino Ethernet shield)
 #if defined(MY_IP_GATEWAY_ADDRESS) && defined(MY_IP_SUBNET_ADDRESS)
 	// DNS server set to gateway ip
 	Ethernet.begin(_ethernetGatewayMAC, _ethernetGatewayIP, _gatewayIp, _gatewayIp, _subnetIp);
@@ -198,7 +274,7 @@ bool gatewayTransportInit(void)
 	              Ethernet.localIP()[1], Ethernet.localIP()[2], Ethernet.localIP()[3]);
 	// give the Ethernet interface a second to initialize
 	delay(1000);
-#endif /* MY_GATEWAY_ESP8266 / MY_GATEWAY_ESP32 */
+#endif /* End of platform-specific initialization */
 
 #if defined(MY_GATEWAY_CLIENT_MODE)
 #if defined(MY_USE_UDP)
@@ -244,6 +320,7 @@ bool gatewayTransportSend(MyMessage &message)
 	setIndication(INDICATION_GW_TX);
 
 	_w5100_spi_en(true);
+	
 #if defined(MY_GATEWAY_CLIENT_MODE)
 #if defined(MY_USE_UDP)
 #if defined(MY_CONTROLLER_URL_ADDRESS)
@@ -278,7 +355,7 @@ bool gatewayTransportSend(MyMessage &message)
 #endif /* End of MY_USE_UDP */
 #else /* Else part of MY_GATEWAY_CLIENT_MODE */
 	// Send message to connected clients
-#if defined(MY_GATEWAY_ESP8266) || defined(MY_GATEWAY_ESP32)
+#if defined(MY_GATEWAY_ESP8266) || defined(MY_GATEWAY_ESP32) || defined(MY_GATEWAY_ESP32_W5500)
 	for (uint8_t i = 0; i < ARRAY_SIZE(clients); i++) {
 		if (clients[i] && clients[i].connected()) {
 			nbytes += clients[i].write((uint8_t *)_ethernetMessage, strlen(_ethernetMessage));
@@ -295,7 +372,7 @@ bool gatewayTransportSend(MyMessage &message)
 #if defined(MY_USE_UDP)
 // Nothing to do here
 #else
-#if (defined(MY_GATEWAY_ESP8266) || defined(MY_GATEWAY_ESP32) || defined(MY_GATEWAY_LINUX)) && !defined(MY_GATEWAY_CLIENT_MODE)
+#if (defined(MY_GATEWAY_ESP8266) || defined(MY_GATEWAY_ESP32) || defined(MY_GATEWAY_ESP32_W5500) || defined(MY_GATEWAY_LINUX)) && !defined(MY_GATEWAY_CLIENT_MODE)
 bool _readFromClient(uint8_t i)
 {
 	while (clients[i].connected() && clients[i].available()) {
@@ -360,7 +437,8 @@ bool _readFromClient(void)
 bool gatewayTransportAvailable(void)
 {
 	_w5100_spi_en(true);
-#if !defined(MY_IP_ADDRESS) && defined(MY_GATEWAY_W5100)
+	
+#if !defined(MY_IP_ADDRESS) && (defined(MY_GATEWAY_W5100) || defined(MY_GATEWAY_ESP32_W5500))
 	// renew IP address using DHCP
 	gatewayTransportRenewIP();
 #endif
@@ -390,6 +468,7 @@ bool gatewayTransportAvailable(void)
 #endif /* End of MY_CONTROLLER_URL_ADDRESS */
 			GATEWAY_DEBUG(PSTR("GWT:TSA:ETH OK\n"));
 			_w5100_spi_en(false);
+			// 注意：gatewayTransportSend 内部会处理电源管理
 			gatewayTransportSend(buildGw(_msgTmp, I_GATEWAY_READY).set(F(MSG_GW_STARTUP_COMPLETE)));
 			_w5100_spi_en(true);
 			presentNode();
@@ -406,8 +485,8 @@ bool gatewayTransportAvailable(void)
 	}
 #endif /* End of MY_USE_UDP */
 #else /* Else part of MY_GATEWAY_CLIENT_MODE */
-#if defined(MY_GATEWAY_ESP8266) || defined(MY_GATEWAY_ESP32) || defined(MY_GATEWAY_LINUX)
-	// ESP8266/ESP32: Go over list of clients and stop any that are no longer connected.
+#if defined(MY_GATEWAY_ESP8266) || defined(MY_GATEWAY_ESP32) || defined(MY_GATEWAY_ESP32_W5500) || defined(MY_GATEWAY_LINUX)
+	// ESP8266/ESP32/ESP32_W5500: Go over list of clients and stop any that are no longer connected.
 	// If the server has a new client connection it will be assigned to a free slot.
 	bool allSlotsOccupied = true;
 	for (uint8_t i = 0; i < ARRAY_SIZE(clients); i++) {
@@ -421,6 +500,7 @@ bool gatewayTransportAvailable(void)
 				clients[i] = _ethernetServer.available();
 				inputString[i].idx = 0;
 				GATEWAY_DEBUG(PSTR("GWT:TSA:C=%" PRIu8 ",CONNECTED\n"), i);
+				// 注意：gatewayTransportSend 内部会处理电源管理
 				gatewayTransportSend(buildGw(_msgTmp, I_GATEWAY_READY).set(MSG_GW_STARTUP_COMPLETE));
 				// Send presentation of locally attached sensors (and node if applicable)
 				presentNode();
@@ -454,6 +534,7 @@ bool gatewayTransportAvailable(void)
 			client = newclient;
 			GATEWAY_DEBUG(PSTR("GWT:TSA:ETH OK\n"));
 			_w5100_spi_en(false);
+			// 注意：gatewayTransportSend 内部会处理电源管理
 			gatewayTransportSend(buildGw(_msgTmp, I_GATEWAY_READY).set(MSG_GW_STARTUP_COMPLETE));
 			_w5100_spi_en(true);
 			presentNode();
@@ -482,5 +563,3 @@ MyMessage& gatewayTransportReceive(void)
 	// Return the last parsed message
 	return _ethernetMsg;
 }
-
-

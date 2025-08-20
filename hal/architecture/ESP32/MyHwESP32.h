@@ -41,7 +41,10 @@
 #include <WiFi.h>
 #include "EEPROM.h"
 #include <SPI.h>
-
+// #include <ETH.h>
+#include <esp_system.h>
+#include <esp_mac.h>
+#include <driver/temperature_sensor.h>
 #ifdef __cplusplus
 #include <Arduino.h>
 #endif

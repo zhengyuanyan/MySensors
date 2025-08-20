@@ -24,6 +24,21 @@
 
 #include "MyHwESP32.h"
 
+static temperature_sensor_handle_t temperature_handle_t = nullptr;
+static int temperature = 0;
+
+void initCpuTemp(void){
+	temperature_sensor_config_t temp_sensor_config = TEMPERATURE_SENSOR_CONFIG_DEFAULT(20, 90);
+	esp_err_t ret = temperature_sensor_install(&temp_sensor_config, &temperature_handle_t);
+	if (ret != ESP_OK) {
+		//Serial.println("I2C init failed");
+	} else {
+		//Serial.println("I2C init OK");
+	}
+
+
+}
+
 bool hwInit(void)
 {
 #if !defined(MY_DISABLED_SERIAL)
@@ -33,6 +48,11 @@ bool hwInit(void)
 #endif
 #endif
 	return EEPROM.begin(MY_EEPROM_SIZE);
+
+#if defined(ARDUINO_ESP32S2) || defined(ARDUINO_ESP32S3) || defined(ARDUINO_ESP32C3)
+	initCpuTemp();
+#endif
+
 }
 
 void hwReadConfigBlock(void *buf, void *addr, size_t length)
@@ -70,10 +90,23 @@ void hwWriteConfig(const int addr, uint8_t value)
 
 bool hwUniqueID(unique_id_t *uniqueID)
 {
-	uint64_t val = ESP.getEfuseMac();
-	(void)memcpy(static_cast<void *>(uniqueID), (void *)&val, 8);
-	(void)memset(static_cast<void *>(uniqueID + 8), MY_HWID_PADDING_BYTE, 8); // padding
-	return true;
+	// uint64_t val = ESP.getEfuseMac();
+	// (void)memcpy(static_cast<void *>(uniqueID), (void *)&val, 8);
+	// (void)memset(static_cast<void *>(uniqueID + 8), MY_HWID_PADDING_BYTE, 8); // padding
+	// return true;
+    uint64_t val = 0;
+
+#if defined(ESP_IDF_VERSION) && ESP_IDF_VERSION >= ESP_IDF_VERSION_VAL(4, 3, 0)
+    // 新版本 Arduino-ESP32 (基于 IDF 4.4+) 支持 esp_efuse_mac_get_default
+    esp_efuse_mac_get_default((uint8_t*)&val);
+#else
+    // 旧版兼容，读 base MAC 地址
+    esp_read_mac((uint8_t*)&val, ESP_MAC_WIFI_STA);
+#endif
+
+    memcpy(uniqueID, &val, 8);
+    memset(((uint8_t*)uniqueID) + 8, MY_HWID_PADDING_BYTE, 8);
+    return true;
 }
 
 ssize_t hwGetentropy(void *__buffer, size_t __length)
@@ -153,11 +186,26 @@ uint16_t hwCPUFrequency(void)
 
 int8_t hwCPUTemperature(void)
 {
-	// CPU temperature in °C
+#if defined(ARDUINO_ESP32)
+	// 原生 ESP32 (带有 temperatureRead())
 	return static_cast<int8_t>((temperatureRead() - MY_ESP32_TEMPERATURE_OFFSET) /
 	                           MY_ESP32_TEMPERATURE_GAIN);
-}
 
+#elif defined(ARDUINO_ESP32S2) || defined(ARDUINO_ESP32S3) || defined(ARDUINO_ESP32C3)
+	// 这些芯片有官方温度传感器驱动
+	if (temp_handle) {
+		int temp = 0;
+		if (temperature_sensor_get_celsius(temp_handle, &temp) == ESP_OK) {
+			return static_cast<int8_t>(temp);
+		}
+	}
+	return -1;
+
+#else
+	return FUNCTION_NOT_SUPPORTED;
+#endif
+
+}
 uint16_t hwFreeMem(void)
 {
 	return static_cast<uint16_t>(ESP.getFreeHeap());
