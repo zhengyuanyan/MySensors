@@ -318,7 +318,7 @@ bool transportSend(const uint8_t to, const void *data, const uint8_t len, const 
         if(twai_transmit(&msg,pdMS_TO_TICKS(100))!=ESP_OK){ CAN_DEBUG("!CAN:SND:FAIL part=%u\n",part); return false; }
 #elif defined(ARDUINO_ARCH_STM32)
         CAN_msg_t msg={};
-        msg.id = header; msg.len = partLen; msg.format = EXTENDED_FORMAT; msg.type = 0;
+        msg.id = header; msg.len = partLen; msg.format = EXTENDED_FORMAT; msg.type = DATA_FRAME;
         memcpy(msg.data, buf, partLen);
  
         // CANSend(&msg);
@@ -418,7 +418,7 @@ void transportPowerDown(void){
 #if defined(ARDUINO_ARCH_ESP32) 
     twai_stop();
 #elif defined(ARDUINO_ARCH_STM32) 
-    CANDeinit();
+    // CANDeinit();
 #else 
     _MCP_CAN.setMode(MCP_SLEEP);
 #endif

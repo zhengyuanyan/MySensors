@@ -1750,39 +1750,6 @@
 // #define MY_GATEWAY_ESP32_W5500
 
 
-// #define MY_DEFAULT_LED_PCA9685
-
-#if defined MY_DEFAULT_LED_PCA9685
-
-#define LED_POLARITY LED_COMMON_ANODE  // LED_COMMON_CATHODE(低电平灭，高电平亮) or LED_COMMON_ANODE(高电平灭，低电平亮)
-
-
-#ifndef PCA9685_I2C_SDA_PIN
-#define PCA9685_I2C_SDA_PIN 8
-#endif
-
-#ifndef PCA9685_I2C_SCL_PIN
-#define PCA9685_I2C_SCL_PIN 9
-#endif
-
-#ifndef PCA9685_I2C_FREQUENCY
-#define PCA9685_I2C_FREQUENCY 400000
-#endif
-
-#ifndef PCA9685_PWM_FREQUENCY
-#define PCA9685_PWM_FREQUENCY 500
-#endif
-
-#ifndef MY_DEFAULT_POWER_PCA9685_PIN
-#define MY_DEFAULT_POWER_PCA9685_PIN 0
-#endif
-
-#define MY_DEFAULT_ERR_LED_PIN 1  // Error led pin
-#define MY_DEFAULT_RX_LED_PIN  2  // Receive led pin
-#define MY_DEFAULT_TX_LED_PIN  3  // Transmit led pin
-
-#endif
-
 // 默认 W5500 引脚定义（可根据硬件修改）
 #if defined MY_GATEWAY_ESP32_W5500
 
