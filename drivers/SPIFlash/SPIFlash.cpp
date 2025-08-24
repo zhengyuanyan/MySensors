@@ -51,7 +51,7 @@ uint8_t SPIFlash::UNIQUEID[8];
 // Suppress uninitialized member variable in constructor because some memory can be saved with
 // on-demand initialization of these members
 // cppcheck-suppress uninitMemberVar
-SPIFlash::SPIFlash(uint8_t slaveSelectPin, uint16_t jedecID)
+SPIFlash::SPIFlash(uint8_t slaveSelectPin, uint32_t jedecID)
 {
 	_slaveSelectPin = slaveSelectPin;
 	_jedecID = jedecID;
@@ -123,18 +123,20 @@ bool SPIFlash::initialize()
 }
 
 /// Get the manufacturer and device ID bytes (as a short word)
-uint16_t SPIFlash::readDeviceId()
+uint32_t SPIFlash::readDeviceId()
 {
+	uint8_t id[3];
 #if defined(__AVR_ATmega32U4__) // Arduino Leonardo, MoteinoLeo
 	command(SPIFLASH_IDREAD); // Read JEDEC ID
 #else
 	select();
 	SPI.transfer(SPIFLASH_IDREAD);
 #endif
-	uint16_t jedecid = SPI.transfer(0) << 8;
-	jedecid |= SPI.transfer(0);
+    id[0] = SPI.transfer(0);       // Manufacturer
+    id[1] = SPI.transfer(0);       // Memory Type
+    id[2] = SPI.transfer(0);       // Capacity
 	unselect();
-	return jedecid;
+	return  ((uint32_t)id[0] << 16) | ((uint32_t)id[1] << 8) | id[2];
 }
 
 /// Get the 64 bit unique identifier, stores it in UNIQUEID[8]. Only needs to be called once, ie after initialize

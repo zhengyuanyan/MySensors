@@ -1613,6 +1613,9 @@
 #define MY_OTA_FLASH_JDECID (0x1F65)
 #endif
 
+#ifndef MY_OTA_BLOCKS
+#define MY_OTA_BLOCKS (2)
+#endif
 /**
  * @def MY_DISABLE_REMOTE_RESET
  * @brief Disables over-the-air reset of node
